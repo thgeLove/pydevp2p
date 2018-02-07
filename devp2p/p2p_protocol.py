@@ -149,7 +149,7 @@ class P2PProtocol(BaseProtocol):
             useless_peer = 3
             too_many_peers = 4
             already_connected = 5
-            incompatibel_p2p_version = 6
+            incompatible_p2p_version = 6
             null_node_identity_received = 7
             client_quitting = 8
             unexpected_identity = 9  # i.e. a different identity to a previous connection or

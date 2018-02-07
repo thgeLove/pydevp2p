@@ -29,6 +29,7 @@ class Peer(gevent.Greenlet):
     offset_based_dispatch = False
     wait_read_timeout = 0.001
     dumb_remote_timeout = 10.0
+    compatible_p2p_version = 5
 
     def __init__(self, peermanager, connection, remote_pubkey=None):
         super(Peer, self).__init__()
@@ -126,9 +127,11 @@ class Peer(gevent.Greenlet):
         self.hello_received = True
 
         # enable backwards compatibility for legacy peers
-        if version < 5:
+        if version <= self.compatible_p2p_version:
             self.offset_based_dispatch = True
             max_window_size = 2**32  # disable chunked transfers
+        else:
+            proto.send_disconnect(proto.disconnect.reason.incompatible_p2p_version)
 
         # call peermanager
         agree = self.peermanager.on_hello_received(
