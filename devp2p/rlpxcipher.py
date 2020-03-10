@@ -33,6 +33,8 @@ class FormatError(RLPxSessionError): pass
 
 supported_rlpx_version = 4
 
+# RLP를 토해 전송/수신 메시지에 대해 인코딩/디코딩한다. 상호동일하게 만들어진 비밀키를 통해 암호화한다.
+# MultiplexedSession 은 이 부분에 대해서 RlpxSession을 이용한다.
 class RLPxSession(object):
 
     ephemeral_ecc = None
@@ -153,6 +155,9 @@ class RLPxSession(object):
 
     ### handshake auth message handling
 
+
+    # 첫번째 핸드쉐이킹 암호화를 위한 정보 공유
+    # ECDH 를 이용하여 양쪽 노드끼리 동일한 비밀키를 만든다.
     def create_auth_message(self, remote_pubkey, ephemeral_privkey=None, nonce=None):
         """
         1. initiator generates ecdhe-random and nonce and creates auth

@@ -31,6 +31,7 @@ class Peer(gevent.Greenlet):
     dumb_remote_timeout = 10.0
     compatible_p2p_version = 5
 
+    # MultiplexedSession 을 이용하여 리모트 노드와 핸드쉐이크를 통해 상호 신뢰할 수 있는 연결정보를 확보해놓는데 사용한다.
     def __init__(self, peermanager, connection, remote_pubkey=None):
         super(Peer, self).__init__()
         self.is_stopped = False
@@ -43,7 +44,10 @@ class Peer(gevent.Greenlet):
 
         # create multiplexed encrypted session
         privkey = decode_hex(self.config['node']['privkey_hex'])
+        # P2P Protocol 의 get_hello_packet 클래스메소드를 통해 hello packet을 만든다. 이 패킷은 rlp 인코딩되어 리턴된다.
         hello_packet = P2PProtocol.get_hello_packet(self)
+        # MultiplexedSession 을 통해서 보내어 질 최정 메시지를 만들기 위한 각종 작업을 시작한다.
+        # 또한 앞으로 교환정보를 암호화할 비밀키 생성 및 프로토콜 교호나을 위한 작업도 담당한다.
         self.mux = MultiplexedSession(privkey, hello_packet, remote_pubkey=remote_pubkey)
         self.remote_pubkey = remote_pubkey
         self.remote_capabilities = None
@@ -116,6 +120,9 @@ class Peer(gevent.Greenlet):
         assert issubclass(protocol, BaseProtocol)
         return protocol in self.protocols
 
+    # capabilities에 상대방이 제공하는 wire protocol의 정보가 담겨있다.
+    # 상대방의 capabilities(와이어프로토콜집합)을 등록, 기본 프로토콜(P2P protocol) 이외의 서비스가 서로간에 존재한다면 서비스 요청을 한다.
+    # 추가된 프로토콜은 여러 프로토콜이 공평하게 메시지를 전달할 수 있도록 Framming 전략에 따라 처리된다. 
     def receive_hello(self, proto, version, client_version_string, capabilities,
                       listen_port, remote_pubkey):
         log.debug('received hello', proto=proto, version=version,
@@ -145,6 +152,7 @@ class Peer(gevent.Greenlet):
 
         # register in common protocols
         log.debug('connecting services', services=self.peermanager.wired_services)
+        # 리모트 서비스 등록
         remote_services = dict()
         for name, version in capabilities:
             if isinstance(name, bytes) and not isinstance(name, str):
@@ -152,6 +160,7 @@ class Peer(gevent.Greenlet):
             if not name in remote_services:
                 remote_services[name] = []
             remote_services[name].append(version)
+        # p2p protocol은 기본적으로 있기때문에, 다른 서비스가 존재한다면 그것에 대한 접속 요청
         for service in sorted(self.peermanager.wired_services, key=operator.attrgetter('name')):
             proto = service.wire_protocol
             assert isinstance(service, WiredService)

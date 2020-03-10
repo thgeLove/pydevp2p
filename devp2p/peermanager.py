@@ -24,6 +24,8 @@ def on_peer_exit(peer):
     peer.stop()
 
 
+# StreamServer 를 통해 발생하는 명령들을 최종적으로 TCP를 이용하여 전송하고 받는다.
+# peer들과 연결된 후에 각각 peer 객체를 생성해서 개별적으로 통신하게 한다.
 class PeerManager(WiredService):
 
     """
@@ -111,16 +113,19 @@ class PeerManager(WiredService):
 
     def _start_peer(self, connection, address, remote_pubkey=None):
         # create peer
+        # 해당 노드와 1대1로 통신하기 위한 peer 객체를 생성한다.
         peer = Peer(self, connection, remote_pubkey=remote_pubkey)
         peer.link(on_peer_exit)
         log.debug('created new peer', peer=peer, fno=connection.fileno())
         self.peers.append(peer)
 
         # loop
+        # peer 경량 스레드를 시작한다.
         peer.start()
         log.debug('peer started', peer=peer, fno=connection.fileno())
         assert not connection.closed
         return peer
+
 
     def connect(self, address, remote_pubkey):
         log.debug('connecting', address=address)
@@ -131,6 +136,7 @@ class PeerManager(WiredService):
         getdefaulttimeout() is default
         """
         try:
+            # 먼저 gevent 소켓통신 라이브러리에서 제공하는 create_connection으로 연결정보(소켓디스크립션)을 얻는다.
             connection = create_connection(address, timeout=self.connect_timeout)
         except socket.timeout:
             log.debug('connection timeout', address=address, timeout=self.connect_timeout)
@@ -141,6 +147,7 @@ class PeerManager(WiredService):
             self.errors.add(address, 'connection error')
             return False
         log.debug('connecting to', connection=connection)
+        # 이제 해당 노드와 1대1로 통신하기 위한 Peer 객체를 생성한다.
         self._start_peer(connection, address, remote_pubkey)
         return True
 
@@ -156,6 +163,7 @@ class PeerManager(WiredService):
     def start(self):
         log.info('starting peermanager')
         # try upnp nat
+        # NAT 문제를 해결하기 위한 upnp 설정
         self.nat_upnp = add_portmap(
             self.config['p2p']['listen_port'],
             'TCP',
@@ -163,10 +171,18 @@ class PeerManager(WiredService):
         )
         # start a listening server
         log.info('starting listener', addr=self.listen_addr)
+
+        # TCP 서버의 listening 핸들러 설정. 새로운 접속이 들어오면 호출된다.
         self.server.set_handle(self._on_new_connection)
+        # TCP 서버 시작
         self.server.start()
         super(PeerManager, self).start()
+
+        # gevent는 일종의 경량 쓰레드
+
+        # bootstrap 시작(이미 하드코딩되어 있는 시작 노드에 접속한다.)
         gevent.spawn_later(0.001, self._bootstrap, self.config['p2p']['bootstrap_nodes'])
+        # discovery 시작(새로 접속할 노드를 선택하기 위해 kademlia routing table을 참조한다.)
         gevent.spawn_later(1, self._discovery_loop)
 
     def _on_new_connection(self, connection, address):
@@ -187,33 +203,43 @@ class PeerManager(WiredService):
     def remote_pubkeys(self):
         return [p.remote_pubkey for p in self.peers]
 
+
     def _discovery_loop(self):
         log.info('waiting for bootstrap')
+        # kademlia node discovery 가 어느정도 완성 될 때까지 대기
         gevent.sleep(self.discovery_delay)
+        # 이제부터 계속 접속할 노드를 찾는 과정을 반복한다.
         while not self.is_stopped:
             try:
                 num_peers, min_peers = self.num_peers(), self.config['p2p']['min_peers']
+                # 접속할 노드를 선택하기 위해 미리 채워두었던 kademlia 프로토콜을 참조한다.
                 kademlia_proto = self.app.services.discovery.protocol.kademlia
+                # 접속할 최소 피어수보다 많을때까지 추가한다.
                 if num_peers < min_peers:
                     log.debug('missing peers', num_peers=num_peers,
                               min_peers=min_peers, known=len(kademlia_proto.routing))
+                    #접속할 노드를 선택하기 위해 랜덤으로 node id 하나를 생성한다.
                     nodeid = kademlia.random_nodeid()
+                    # kademlia routing table에서 가까운 노드들을 가져온다.
                     kademlia_proto.find_node(nodeid)  # fixme, should be a task
                     gevent.sleep(self.discovery_delay)  # wait for results
                     neighbours = kademlia_proto.routing.neighbours(nodeid, 2)
                     if not neighbours:
                         gevent.sleep(self.connect_loop_delay)
                         continue
+                    # 가져온 노드들 중에 노드 하나를 선택한다. 이 무작위로 선택한 노드와 연결될 것이다.
                     node = random.choice(neighbours)
                     if node.pubkey in self.remote_pubkeys():
                         gevent.sleep(self.discovery_delay)
                         continue
                     log.debug('connecting random', node=node)
+                    # 내 public key를 구해서
                     local_pubkey = crypto.privtopub(decode_hex(self.config['node']['privkey_hex']))
                     if node.pubkey == local_pubkey:
                         continue
                     if node.pubkey in [p.remote_pubkey for p in self.peers]:
                         continue
+                    # 선택된 노드와 연결한다. (그 노드에 내 public key를 보낸다)
                     self.connect((node.address.ip, node.address.tcp_port), node.pubkey)
             except AttributeError:
                 # TODO: Is this the correct thing to do here?

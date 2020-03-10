@@ -202,6 +202,7 @@ class DiscoveryProtocol(kademlia.WireInterface):
     # elements beyond this length are trimmed.
     cmd_elem_count_map = dict(ping=4, pong=3, find_node=2, neighbours=2)
 
+    # RLP를 사용하여 전송/수신 메시지에 대해 인코딩/디코딩
     encoders = dict(cmd_id=chr,
                     expiration=rlp.sedes.big_endian_int.serialize)
 
@@ -244,6 +245,11 @@ class DiscoveryProtocol(kademlia.WireInterface):
         msg = crypto.sha3(msg)
         return crypto.sign(msg, self.privkey)
 
+
+    # find_node 에 해당하는 cmd_id와 실제 보내질 메시지를 인자로 받는다.
+    # rlp.encode를 통해 payload를 인코딩한다.
+    # 인코딩된 데이터를 sha3 로 서명하고 무결성읠 위하여 MDC를 만든다.
+    # 최종적으로 MDC + 서명 + CMD_ID + 실제 데이터가 보내어진다.
     def pack(self, cmd_id, payload):
         """
         UDP packets are structured as follows:
@@ -431,6 +437,8 @@ class DiscoveryProtocol(kademlia.WireInterface):
         else:
             log.debug('<<< unexpected pong from unkown node')
 
+
+    # 해당 메시지를 packing 하여 UDP로 보낸다. 여기서 .pack이 바로 RLP 인코딩이다.
     def send_find_node(self, node, target_node_id):
         """
         ### Find Node (type 0x03)
@@ -517,6 +525,7 @@ class NodeDiscovery(BaseService, DiscoveryProtocolTransport):
     Persist the list of known nodes with their reputation
     """
 
+    # 노드 디스커버리를 위한 port 30303 을 설정한다.
     name = 'discovery'
     server = None  # will be set to DatagramServer
     nat_upnp = None
@@ -527,6 +536,8 @@ class NodeDiscovery(BaseService, DiscoveryProtocolTransport):
         ),
         node=dict(privkey_hex=''))
 
+    # NodeDiscovery 서비스는 노드를 찾기위한 DiscoveryProtocol을 사용한다. 구체적으로는 KademliaProtocol
+    # DiscoveryProtocol 객체를 생성
     def __init__(self, app):
         BaseService.__init__(self, app)
         log.info('NodeDiscovery init')
@@ -547,6 +558,8 @@ class NodeDiscovery(BaseService, DiscoveryProtocolTransport):
     #     log.debug('sending', size=len(message), to=address)
     #     sock.send(message)
 
+    # DiscoveryProtocol을 통해 발생하는 명령들을 최종적으로 UDP를 이용하여 전송하고 받는다.
+    # remote node로 message 전송, UDP server 사용
     def send(self, address, message):
         assert isinstance(address, Address)
         log.debug('sending', size=len(message), to=address)
@@ -557,6 +570,8 @@ class NodeDiscovery(BaseService, DiscoveryProtocolTransport):
             log.debug('waiting for recovery')
             gevent.sleep(0.5)
 
+    # remote node에서 받는 message를 kademlia 프로토콜 객체로 건네준다.
+    # 즉 비지니스 로직은 kademlia 프로토콜 객체에 있고, NodeDiscovery는 전달자, 조정자의 역할
     def receive(self, address, message):
         assert isinstance(address, Address)
         self.protocol.receive(address, message)
@@ -571,6 +586,10 @@ class NodeDiscovery(BaseService, DiscoveryProtocolTransport):
             log.debug("failed to handle discovery packet",
                       error=e, message=message, ip_port=ip_port)
 
+    # NodeDiscovery를 시작한다.
+    # 1. UPnP 설정을 하여 nat 에서도 사용되게 한다.
+    # 2. DatagramServer를 시작한다.
+    # 3. kademlia protocol 을 이용하여 설정파일에 기록되어 있는 노드를 통해 bootstrap 한다.
     def start(self):
         log.info('starting discovery')
         # start a listening server

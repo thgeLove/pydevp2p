@@ -280,6 +280,8 @@ class RoutingTable(object):
             for n in b.nodes:
                 yield n
 
+    # 인자로 들어온 node와 가장 가까운 버킷에서 가장 가까운 노드부터 채워넣는다.
+    # k_bucket_size 의 2배만큼
     def neighbours(self, node, k=k_bucket_size):
         """
         sorting by bucket.midpoint does not work in edge cases
@@ -362,6 +364,10 @@ class KademliaProtocol(object):
         self._find_requests = dict()  # nodeid -> timeout
         self._deleted_pingids = set()
 
+    # 가장먼저 부트스트랩 노드를 일단 라우팅 테이블에 추가한다.(라우팅 테이블은 계속 업데이트된다.)
+    # 그 후에 find_node 를 통해 자신과 가까운 노드들의 정보를 물어본다.
+    # find_node 의 첫번째 인자는 자신이고, 두번째는 부트스트랩 노드이다.
+    # 즉 부트스트랩 노드에게 자신의 노드와 가까운 노드를 찾아달라는 것이다.
     def bootstrap(self, nodes):
         assert isinstance(nodes, list)
         for node in nodes:
@@ -370,25 +376,26 @@ class KademliaProtocol(object):
             self.routing.add_node(node)
             self.find_node(self.this_node.id, via_node=node)
 
+    # 새로운 노드를 추가할 때 (N1)
     def update(self, node, pingid=None):
         """
-        When a Kademlia node receives any message (request or reply) from another node,
+        When a Kademlia node receives any message (request or reply) from another node (N1),
         it updates the appropriate k-bucket for the sender’s node ID.
 
-        If the sending node already exists in the recipient’s k- bucket,
+        If the sending node already exists in the recipient’s k- bucket,       =====>  if there is N1 in the k-bucket --> moves N1 to the tail
         the recipient moves it to the tail of the list.
 
-        If the node is not already in the appropriate k-bucket
+        If the node is not already in the appropriate k-bucket                  =====> if the number of node in the k-buckec < k --> N1 inserted
         and the bucket has fewer than k entries,
         then the recipient just inserts the new sender at the tail of the list.
 
-        If the  appropriate k-bucket is full, however,
-        then the recipient pings the k-bucket’s least-recently seen node to decide what to do.
+        If the  appropriate k-bucket is full, however,                          =====> if the number of node in the k-buckec == k --> N2 유효성 검증
+        then the recipient pings the k-bucket’s least-recently seen node(N2) to decide what to do.
 
-        If the least-recently seen node fails to respond,
+        If the least-recently seen node fails to respond,                       =====> N2 유효성 검증에 실패하면 --> N2 삭제, N1 삽입
         it is evicted from the k-bucket and the new sender inserted at the tail.
 
-        Otherwise, if the least-recently seen node responds,
+        Otherwise, if the least-recently seen node responds,                    =====> N2 유효성 검증에 성공하면 --> N1 삭제(?), N2는 tail로
         it is moved to the tail of the list, and the new sender’s contact is discarded.
 
         k-buckets effectively implement a least-recently seen eviction policy,
@@ -540,10 +547,15 @@ class KademliaProtocol(object):
         # update rest
         self.update(remote, pingid)
 
+    # 라우팅테이블의 neighbours 메소드를 호출하여 가까운 것을들 찾아서 모두에게 find_node를 부탁한다.
     def _query_neighbours(self, targetid):
         for n in self.routing.neighbours(targetid)[:k_find_concurrency]:
             self.wire.send_find_node(n, targetid)
 
+    # via_node 에게 targetid 와 가까운 노드를 찾아달라는 것이다. 만약 특정 via_node가 없으면
+    # 자신의 라우팅테이블에서 검색해서 가까운 노드들에게 모두 find_node를 시키며
+    # via_node 가 있으면, 리모트 노드에게 물어본다.
+    # 여기서 find_requests는 일정시간동안 응답이 없으면 무효화하기 위함이다.
     def find_node(self, targetid, via_node=None):
         # FIXME, amplification attack (need to ping pong ping pong first)
         assert is_integer(targetid)

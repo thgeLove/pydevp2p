@@ -96,6 +96,7 @@ node:
     app = BaseApp(config)
 
     # register services
+    # 두개의 서비스를 등록하고 시작한다.
     NodeDiscovery.register_with_app(app)
     PeerManager.register_with_app(app)
 

@@ -57,7 +57,8 @@ class ConnectionMonitor(gevent.Greenlet):
 
 log = slogging.get_logger('p2p.protocol')
 
-
+# 핸드쉐이킹을 통해 상호 프로토콜 정보와 암호정보를 교환하는 프로토콜과 ping, pong 을 통해 연결을 확인하는 명령이 있다. 
+# 이 모든것은 MultiplexedSession을 통해서 한다. rlp 인코딩을 한 메시지를 전달함
 class P2PProtocol(BaseProtocol):
 
     """
@@ -128,6 +129,9 @@ class P2PProtocol(BaseProtocol):
             BaseProtocol.command.receive(self, proto, data)
 
     @classmethod
+    # 상호 적용가능한 wire protocol에 대한 정보교환
+    # receive_hello 와 대응
+    # 리모트 노드에 내 정보를 보내준다. capabilities에 내가 제공하는 와이어프로토콜의 정보가 담긴다.
     def get_hello_packet(cls, peer):
         "special: we need this packet before the protocol can be initalized"
         res = dict(version=cls.version,

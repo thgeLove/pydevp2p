@@ -15,6 +15,7 @@ class SubProtocolError(ProtocolError):
     pass
 
 
+# 모든 프로토콜이 가져야할 공통적인 메소드를 가진다. 하위 객체에서 생성하는 각각의 커맨드 프로토콜의 create/send/receive/receive_callback 메소드를 자동으로 만들어주는 리플렉션 기본이 들어가 있다.
 class BaseProtocol(gevent.Greenlet):
 
     """
