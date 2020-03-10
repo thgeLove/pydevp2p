@@ -1,28 +1,8 @@
-===============================
-pydevp2p
-===============================
+Introduction
+------------
 
-.. image:: https://badges.gitter.im/Join%20Chat.svg
-   :alt: Join the chat at https://gitter.im/ethereum/pydevp2p
-   :target: https://gitter.im/ethereum/pydevp2p?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
-
-.. image:: https://badge.fury.io/py/devp2p.png
-    :target: https://badge.fury.io/py/devp2p
-
-.. image:: https://travis-ci.org/ethereum/pydevp2p.png?branch=master
-        :target: https://travis-ci.org/ethereum/pydevp2p
-
-.. image:: https://coveralls.io/repos/ethereum/pydevp2p/badge.svg
-        :target: https://coveralls.io/r/ethereum/pydevp2p
-
-.. image:: https://readthedocs.org/projects/pydevp2p/badge/?version=latest
-        :target: https://readthedocs.org/projects/pydevp2p/?badge=latest
-
-
-Python implementation of the Ethereum P2P stack
-
-* Free software: BSD license
-* Documentation: https://pydevp2p.readthedocs.org.
+pydevp2p is the Python implementation of the RLPx network layer.
+RLPx provides a general-purpose transport and interface for applications to communicate via a p2p network. The first version is geared towards building a robust transport, well-formed network, and software interface in order to provide infrastructure which meets the requirements of distributed or decentralized applications such as Ethereum. Encryption is employed to provide better privacy and integrity than would be provided by a cleartext implementation.
 
 ![app](./image/app.png)
 ![NodeDiscovery](./image/class_structure_nodeDiscovery.png)
@@ -31,11 +11,7 @@ Python implementation of the Ethereum P2P stack
 ref)https://hamait.tistory.com/968?category=276132
 
 
-Introduction
-------------
 
-pydevp2p is the Python implementation of the RLPx network layer.
-RLPx provides a general-purpose transport and interface for applications to communicate via a p2p network. The first version is geared towards building a robust transport, well-formed network, and software interface in order to provide infrastructure which meets the requirements of distributed or decentralized applications such as Ethereum. Encryption is employed to provide better privacy and integrity than would be provided by a cleartext implementation.
 
 RLPx underpins the DEVp2p interface:
 
