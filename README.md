@@ -5,8 +5,11 @@ pydevp2p is the Python implementation of the RLPx network layer.
 RLPx provides a general-purpose transport and interface for applications to communicate via a p2p network. The first version is geared towards building a robust transport, well-formed network, and software interface in order to provide infrastructure which meets the requirements of distributed or decentralized applications such as Ethereum. Encryption is employed to provide better privacy and integrity than would be provided by a cleartext implementation.
 
 ![app](./image/app.png)
+-----------------------------------------------------------
 ![NodeDiscovery](./image/class_structure_nodeDiscovery.png)
+-----------------------------------------------------------
 ![PeerManager](./image/class_structure_peerManager.png)
+-----------------------------------------------------------
 
 ref)https://hamait.tistory.com/968?category=276132
 
